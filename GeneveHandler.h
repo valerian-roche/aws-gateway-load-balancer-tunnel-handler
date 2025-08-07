@@ -26,14 +26,14 @@ typedef std::function<void(std::string inInt, std::string outInt, eniid_t eniId)
 class GwlbData {
 public:
     GwlbData();
-    GwlbData(GenevePacket &gp, struct in_addr *srcAddr, uint16_t srcPort, struct in_addr *dstAddr, uint16_t dstPort);
+    GwlbData(GenevePacket gp, struct in_addr *srcAddr, uint16_t srcPort, struct in_addr *dstAddr, uint16_t dstPort);
 
     // Elements are arranged so that when doing sorting/searching, we get entropy early. This gives a slight
     // improvement to the lookup time.
     GenevePacket gp;
     struct in_addr srcAddr;
-    uint16_t srcPort;
     struct in_addr dstAddr;
+    uint16_t srcPort;
     uint16_t dstPort;
 };
 
@@ -65,7 +65,7 @@ class GeneveHandlerENI {
 public:
     GeneveHandlerENI(eniid_t eni, int cacheTimeout, ThreadConfig& tunThreadConfig, ghCallback createCallback, ghCallback destroyCallback);
     ~GeneveHandlerENI();
-    void udpReceiverCallback(const GwlbData &gd, unsigned char *pkt, ssize_t pktlen);
+    void udpReceiverCallback(GwlbData gd, unsigned char *pkt, ssize_t pktlen);
     void tunReceiverCallback(unsigned char *pktbuf, ssize_t pktlen);
     GeneveHandlerENIHealthCheck check();
     bool hasGoneIdle(int timeout);

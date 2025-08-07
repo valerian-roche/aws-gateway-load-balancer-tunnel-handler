@@ -266,18 +266,18 @@ int main(int argc, char *argv[])
     // GWLB only supports IPv4.
     if(healthCheck > 0)
     {
-        if((healthSocket = socket(AF_INET6, SOCK_STREAM, 0)) == 0)
+        if((healthSocket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
         {
             LOG(LS_CORE, LL_CRITICAL, "Creating health check socket failed: "s + std::strerror(errno));
             exit(EXIT_FAILURE);
         }
 
-        struct sockaddr_in6 addr;
+        struct sockaddr_in addr;
         bzero(&addr, sizeof(addr));
 
-        addr.sin6_family = AF_INET6;
-        addr.sin6_port = htons(healthCheck);
-        addr.sin6_addr = in6addr_any;
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(healthCheck);
+        addr.sin_addr.s_addr = INADDR_ANY;
         if(bind(healthSocket, (struct sockaddr *)&addr, sizeof(addr)) < 0)
         {
             LOG(LS_CORE, LL_CRITICAL, "Unable to listen to health status port: "s + std::strerror(errno));

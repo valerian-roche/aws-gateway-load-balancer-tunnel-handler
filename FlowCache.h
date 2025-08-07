@@ -46,7 +46,7 @@ public:
  * Cache entry functions
  */
 template<class V> FlowCacheEntry<V>::FlowCacheEntry(V entrydata) :
-        last(time(NULL)), useCount(1), data(entrydata)
+        last(time(NULL)), useCount(1), data(std::move(entrydata))
 {
 }
 
@@ -58,8 +58,8 @@ template<class V> FlowCacheEntry<V>::FlowCacheEntry(V entrydata) :
 template <class K, class V> class FlowCache {
 public:
     FlowCache(std::string cacheName, int cacheTimeout);
-    V lookup(K key);
-    V emplace_or_lookup(K key, V value);
+    V lookup(const K& key);
+    void emplace(K key, V value);
     FlowCacheHealthCheck check();
 private:
     const int cacheTimeout;
@@ -83,7 +83,7 @@ FlowCache<K, V>::FlowCache(std::string cacheName, int cacheTimeout) :
  * @param key Key to lookup
  * @return Value if present, raises invalid_argument exception if key not present.
  */
-template<class K, class V>V FlowCache<K, V>::lookup(K key)
+template<class K, class V>V FlowCache<K, V>::lookup(const K &key)
 {
     V ret;
     if(cache.visit(key, [&](auto& fce) { fce.second.last = time(NULL); fce.second.useCount ++; ret = fce.second.data; }))
@@ -94,17 +94,18 @@ template<class K, class V>V FlowCache<K, V>::lookup(K key)
 
 /**
  * Looks up a value for key K in our cache. If not present, insert with value V.
+ * Optimized version that returns void to avoid unnecessary copying.
  *
  * @param K Key to lookup
  * @param V Value to insert if K is not present.
- * @return Value (either the one looked up, or the inserted data, as appropriate).
  */
-template<class K, class V>V FlowCache<K, V>::emplace_or_lookup(K key, V value)
+template<class K, class V>void FlowCache<K, V>::emplace(K key, V value)
 {
-    V ret;
-    if(!(cache.emplace_or_visit(key, value, [&](auto& fce) { fce.second.last = time(NULL); fce.second.useCount ++; ret = fce.second.data; })))
-        return ret;
-    return value;
+    // Use emplace_or_visit with maximum performance - no copying at all
+    cache.emplace_or_visit(std::move(key), std::move(value), [](auto& fce) { 
+        fce.second.last = time(NULL); 
+        fce.second.useCount++; 
+    });
 }
 
 /**
