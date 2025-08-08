@@ -15,6 +15,7 @@
 #include "GeneveHandler.h"
 #include "utils.h"
 #include <arpa/inet.h>
+#include <memory>
 #include <utility>
 #include "Logger.h"
 
@@ -142,7 +143,7 @@ void GeneveHandler::udpReceiverCallback(unsigned char *pkt, ssize_t pktlen, stru
         }
 
         auto gwlbeEniId = gp.gwlbeEniId;
-        auto gd = GwlbData(std::move(gp), srcAddr, srcPort, dstAddr, dstPort);
+        auto gd = std::make_shared<GwlbData>(std::move(gp), srcAddr, srcPort, dstAddr, dstPort);
 
         auto cb = [&](const auto& eniHandler)
             {
@@ -218,7 +219,7 @@ void GeneveHandlerENI::tunReceiverCallback(unsigned char *pktbuf, ssize_t pktlen
     }
     try
     {
-        GwlbData gd;
+        GwlbDataPtr gd;
 
         switch( (pktbuf[0] & 0xF0) >> 4)
         {
@@ -232,7 +233,7 @@ void GeneveHandlerENI::tunReceiverCallback(unsigned char *pktbuf, ssize_t pktlen
                     LOG(LS_TUNNEL, LL_DEBUG, "Flow " + ph.text() + " has not been seen coming in from GWLB - dropping.  (Remember - GWLB is for inline inspection only - you cannot source new flows from this device into it.)");
                     return;
                 }
-                LOG(LS_TUNNEL, LL_DEBUGDETAIL, "Resolved packet header " + ph.text() + " to options " + gd.gp.text());
+                LOG(LS_TUNNEL, LL_DEBUGDETAIL, "Resolved packet header " + ph.text() + " to options " + gd->gp.text());
                 break;
             }
             case 6:
@@ -245,7 +246,7 @@ void GeneveHandlerENI::tunReceiverCallback(unsigned char *pktbuf, ssize_t pktlen
                     LOG(LS_TUNNEL, LL_DEBUG, "Flow " + ph.text() + " has not been seen coming in from GWLB - dropping.  (Remember - GWLB is for inline inspection only - you cannot source new flows from this device into it.)");
                     return;
                 }
-                LOG(LS_TUNNEL, LL_DEBUGDETAIL, "Resolved packet header " + ph.text() + " to options " + gd.gp.text());
+                LOG(LS_TUNNEL, LL_DEBUGDETAIL, "Resolved packet header " + ph.text() + " to options " + gd->gp.text());
                 break;
             }
             default:
@@ -255,16 +256,16 @@ void GeneveHandlerENI::tunReceiverCallback(unsigned char *pktbuf, ssize_t pktlen
             }
         }
 
-        auto headerLen = gd.gp.header.size();
+        auto headerLen = gd->gp.header.size();
         // Build the packet to send back to GWLB.
         // Following as per https://aws.amazon.com/blogs/networking-and-content-delivery/integrate-your-custom-logic-or-appliance-with-aws-gateway-load-balancer/
         unsigned char *genevePkt = new unsigned char[pktlen + headerLen];
         // Encapsulate this packet with the original Geneve header
-        memcpy(genevePkt, &gd.gp.header.front(), headerLen);
+        memcpy(genevePkt, &gd->gp.header.front(), headerLen);
         // Copy the packet in after the Geneve header.
         memcpy(genevePkt + headerLen, pktbuf, pktlen);
         // Swap source and destination IP addresses, but preserve ports, and send back to GWLB.
-        sendUdp(sendingSock, gd.dstAddr, gd.srcPort, gd.srcAddr, gd.dstPort, genevePkt, pktlen + headerLen);
+        sendUdp(sendingSock, gd->dstAddr, gd->srcPort, gd->srcAddr, gd->dstPort, genevePkt, pktlen + headerLen);
         delete[] genevePkt;
     } catch(std::invalid_argument& err) {
         LOG(LS_TUNNEL, LL_DEBUG, "Packet processor has a malformed packet: "s + err.what());
@@ -281,9 +282,9 @@ void GeneveHandlerENI::tunReceiverCallback(unsigned char *pktbuf, ssize_t pktlen
  * @param pkt The packet received.
  * @param pktlen Length of packet received.
  */
-void GeneveHandlerENI::udpReceiverCallback(GwlbData gd, unsigned char *pkt, ssize_t pktlen)
+void GeneveHandlerENI::udpReceiverCallback(std::shared_ptr<GwlbData> gd, unsigned char *pkt, ssize_t pktlen)
 {
-    auto headerLen = gd.gp.header.size();
+    auto headerLen = gd->gp.header.size();
     try {
         if( (pktlen - headerLen) > (ssize_t)sizeof(struct ip) )
         {

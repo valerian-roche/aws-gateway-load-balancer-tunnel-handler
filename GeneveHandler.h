@@ -5,6 +5,7 @@
 #define GWLBTUN_GENEVEHANDLER_H
 
 #include <future>
+#include <memory>
 #include <vector>
 #include <unordered_map>
 #include <shared_mutex>
@@ -37,6 +38,8 @@ public:
     uint16_t dstPort;
 };
 
+using GwlbDataPtr = std::shared_ptr<GwlbData>;
+
 /**
  * For each ENI (GWLBe) that is detected, a copy of GeneveHandlerENI is created.
  */
@@ -65,7 +68,7 @@ class GeneveHandlerENI {
 public:
     GeneveHandlerENI(eniid_t eni, int cacheTimeout, ThreadConfig& tunThreadConfig, ghCallback createCallback, ghCallback destroyCallback);
     ~GeneveHandlerENI();
-    void udpReceiverCallback(GwlbData gd, unsigned char *pkt, ssize_t pktlen);
+    void udpReceiverCallback(GwlbDataPtr gd, unsigned char *pkt, ssize_t pktlen);
     void tunReceiverCallback(unsigned char *pktbuf, ssize_t pktlen);
     GeneveHandlerENIHealthCheck check();
     bool hasGoneIdle(int timeout);
@@ -82,8 +85,8 @@ private:
 #ifndef NO_RETURN_TRAFFIC
     std::unique_ptr<TunInterface> tunnelOut;
 
-    FlowCache<PacketHeaderV4, GwlbData> gwlbV4Cookies;
-    FlowCache<PacketHeaderV6, GwlbData> gwlbV6Cookies;
+    FlowCache<PacketHeaderV4, GwlbDataPtr> gwlbV4Cookies;
+    FlowCache<PacketHeaderV6, GwlbDataPtr> gwlbV6Cookies;
 #endif
     // Socket used by all threads for sending
     int sendingSock;
